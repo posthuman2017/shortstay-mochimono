@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ショートステイ 持ち物確認</title>
+<style>
+:root{
+  --bg:#f4f6f8; --card:#fff; --line:#d7dde3; --line2:#eef1f4;
+  --text:#1c2429; --muted:#67757f;
+  --accent:#0b6b5e; --accent-soft:#e6f2f0;
+  --warn:#b8341f; --warn-soft:#fdecea;
+  --ok:#1c7a3e; --ok-soft:#e8f5ec;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,Meiryo,sans-serif;
+  font-size:15px; line-height:1.6;
+}
+button{font-family:inherit; font-size:14px; cursor:pointer}
+input,select,textarea{font-family:inherit; font-size:15px; color:var(--text)}
+
+/* ---------- レイアウト ---------- */
+header{
+  background:var(--accent); color:#fff; padding:10px 16px;
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  position:sticky; top:0; z-index:50;
+}
+header h1{font-size:17px; margin:0; font-weight:600; letter-spacing:.02em}
+header .sub{font-size:12px; opacity:.85}
+header .spacer{flex:1}
+header button{
+  background:rgba(255,255,255,.14); color:#fff; border:1px solid rgba(255,255,255,.45);
+  border-radius:6px; padding:6px 12px;
+}
+header button:hover{background:rgba(255,255,255,.26)}
+main{max-width:1180px; margin:0 auto; padding:18px 16px 80px}
+
+.card{background:var(--card); border:1px solid var(--line); border-radius:10px; margin-bottom:16px}
+.card > h2{
+  font-size:14px; margin:0; padding:10px 14px; border-bottom:1px solid var(--line2);
+  background:#fafbfc; border-radius:10px 10px 0 0; letter-spacing:.03em;
+}
+.card .body{padding:14px}
+
+.btn{border:1px solid var(--line); background:#fff; border-radius:6px; padding:7px 14px}
+.btn:hover{background:#f2f5f7}
+.btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+.btn.primary:hover{background:#095a4f}
+.btn.danger{color:var(--warn); border-color:#e8b9b2}
+.btn.danger:hover{background:var(--warn-soft)}
+.btn.sm{padding:3px 9px; font-size:13px}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+
+/* ---------- 基本情報 ---------- */
+.fields{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px 14px}
+.field label{display:block; font-size:12px; color:var(--muted); margin-bottom:3px}
+.field input,.field select{
+  width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:#fff;
+}
+.field input:focus,.field select:focus{outline:2px solid var(--accent-soft); border-color:var(--accent)}
+.stay-info{
+  margin-top:12px; padding:9px 12px; background:var(--accent-soft);
+  border-radius:6px; font-size:14px;
+}
+.stay-info b{font-size:17px; color:var(--accent)}
+
+/* ---------- チェック表 ---------- */
+.sections{display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start}
+@media(max-width:900px){.sections{grid-template-columns:1fr}}
+
+table.items{width:100%; border-collapse:collapse; font-size:14px}
+table.items th{
+  background:#f2f5f7; font-weight:600; font-size:12px; color:var(--muted);
+  border-bottom:1px solid var(--line); padding:6px 4px; white-space:nowrap;
+}
+table.items td{border-bottom:1px solid var(--line2); padding:4px; vertical-align:middle}
+table.items tr:last-child td{border-bottom:none}
+.col-name{width:auto}
+.col-need{width:62px; text-align:center}
+.col-qty{width:60px}
+.col-rem{width:132px}
+.col-act{width:26px}
+.item-name{font-weight:500}
+.item-note{display:block; font-size:11px; color:var(--muted); line-height:1.4}
+.need{font-size:13px; color:var(--muted); text-align:center; white-space:nowrap}
+.need b{color:var(--accent); font-size:15px}
+input.qty{
+  width:100%; padding:5px 2px; text-align:center; border:1px solid var(--line);
+  border-radius:5px; background:#fff;
+}
+input.qty:focus{outline:2px solid var(--accent-soft); border-color:var(--accent)}
+input.rem{width:100%; padding:5px 6px; border:1px solid var(--line); border-radius:5px; font-size:13px}
+tr.diff td{background:var(--warn-soft)}
+tr.diff input.qty{border-color:#d98d80}
+tr.matched input.qty{background:var(--ok-soft); border-color:#a9d5b8}
+.x{
+  border:none; background:none; color:#b5bfc7; font-size:16px; line-height:1;
+  padding:2px 4px; border-radius:4px;
+}
+.x:hover{color:var(--warn); background:var(--warn-soft)}
+.chips{display:flex; flex-wrap:wrap; gap:5px; padding:8px 4px 2px}
+.chip{
+  border:1px dashed var(--line); background:#fff; color:var(--muted);
+  border-radius:12px; padding:2px 9px; font-size:12px;
+}
+.chip:hover{border-color:var(--accent); color:var(--accent); background:var(--accent-soft)}
+.add-line{display:flex; gap:6px; padding:6px 4px}
+.add-line input{flex:1; padding:5px 8px; border:1px solid var(--line); border-radius:5px; font-size:13px}
+
+/* ---------- 照合サマリー ---------- */
+.summary{
+  position:sticky; bottom:0; z-index:40; margin:0 -16px -80px;
+  background:#fff; border-top:2px solid var(--accent);
+  padding:10px 16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+  box-shadow:0 -3px 12px rgba(0,0,0,.08);
+}
+.summary .stat{font-size:13px; color:var(--muted)}
+.summary .stat b{font-size:19px; color:var(--text); margin:0 2px}
+.summary .verdict{
+  flex:1; min-width:230px; padding:7px 12px; border-radius:6px; font-size:14px; font-weight:600;
+}
+.verdict.ok{background:var(--ok-soft); color:var(--ok)}
+.verdict.ng{background:var(--warn-soft); color:var(--warn)}
+.verdict.pending{background:#f2f5f7; color:var(--muted); font-weight:400}
+
+/* ---------- 一覧 ---------- */
+.list-tools{display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap}
+.list-tools input{
+  flex:1; min-width:200px; padding:8px 11px; border:1px solid var(--line); border-radius:6px;
+}
+.rec{
+  display:flex; align-items:center; gap:12px; padding:11px 14px;
+  border-bottom:1px solid var(--line2); cursor:pointer; flex-wrap:wrap;
+}
+.rec:hover{background:#f7f9fa}
+.rec:last-child{border-bottom:none}
+.rec .nm{font-weight:600; min-width:120px}
+.rec .pd{color:var(--muted); font-size:13px; flex:1; min-width:170px}
+.badge{font-size:11px; padding:2px 9px; border-radius:11px; white-space:nowrap}
+.badge.stay{background:var(--accent-soft); color:var(--accent)}
+.badge.done{background:var(--ok-soft); color:var(--ok)}
+.badge.ng{background:var(--warn-soft); color:var(--warn)}
+.empty{padding:36px 14px; text-align:center; color:var(--muted)}
+
+/* ---------- 写真 ---------- */
+.photos{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+.ph{position:relative; width:104px; height:104px; border-radius:6px; overflow:hidden; border:1px solid var(--line)}
+.ph img{width:100%; height:100%; object-fit:cover; display:block}
+.ph button{
+  position:absolute; top:2px; right:2px; border:none; background:rgba(0,0,0,.55); color:#fff;
+  border-radius:4px; width:20px; height:20px; line-height:1; font-size:13px;
+}
+.hint{font-size:12px; color:var(--muted); margin-top:6px}
+textarea.memo{
+  width:100%; min-height:74px; padding:9px; border:1px solid var(--line);
+  border-radius:6px; resize:vertical;
+}
+
+/* ---------- 印刷 ---------- */
+#print{display:none}
+@media print{
+  header,main,.summary{display:none !important}
+  #print{display:block}
+  @page{size:A4 portrait; margin:9mm}
+  body{background:#fff; font-size:10.5px}
+  .pt{width:100%; border-collapse:collapse; table-layout:fixed}
+  .pt th,.pt td{border:1px solid #000; padding:1.6px 3px; height:17px}
+  .pt th{background:#eee; font-size:9px; text-align:center}
+  .p-title{font-size:15px; font-weight:700; text-align:center; margin-bottom:5px}
+  .p-head{display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px}
+  .p-note{border:1px solid #000; padding:3px 5px; font-size:9px; margin-bottom:5px; line-height:1.45}
+  .p-cat{writing-mode:vertical-rl; text-align:center; width:15px; font-size:10px; letter-spacing:.28em}
+  .p-cols{display:flex; gap:5px; align-items:flex-start}
+  .p-cols > div{flex:1; min-width:0}
+  .p-foot{margin-top:5px; font-size:10px; display:flex; justify-content:space-between}
+  .p-diff{background:#ddd !important; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+  .p-memo{border:1px solid #000; margin-top:5px; padding:3px 5px; font-size:9.5px; min-height:44px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ショートステイ 持ち物確認</h1>
+  <span class="sub">来園時／帰園時の数量照合</span>
+  <span class="spacer"></span>
+  <button id="btnList">記録一覧</button>
+  <button id="btnNew">新規作成</button>
+  <button id="btnPrint">印刷</button>
+  <button id="btnBackup">バックアップ</button>
+</header>
+
+<main>
+  <!-- ============ 一覧画面 ============ -->
+  <section id="viewList" hidden>
+    <div class="list-tools">
+      <input id="q" type="search" placeholder="利用者氏名・事業所で絞り込み">
+      <button class="btn primary" id="btnNew2">＋ 新規作成</button>
+    </div>
+    <div class="card"><div id="recs"></div></div>
+  </section>
+
+  <!-- ============ 編集画面 ============ -->
+  <section id="viewEdit" hidden>
+    <div class="card">
+      <h2>基本情報</h2>
+      <div class="body">
+        <div class="fields">
+          <div class="field"><label>利用者氏名</label><input id="f_name" placeholder="お名前"></div>
+          <div class="field"><label>事業所</label><input id="f_office" placeholder="施設・事業所名"></div>
+          <div class="field"><label>利用開始日（来園）</label><input id="f_start" type="date"></div>
+          <div class="field"><label>利用終了日（帰園）</label><input id="f_end" type="date"></div>
+          <div class="field"><label>施設での荷物確認</label>
+            <select id="f_wish"><option value="希望する">希望する</option><option value="希望しない">希望しない</option></select>
+          </div>
+          <div class="field"><label>確認者（来園）</label><input id="f_in" placeholder="職員名"></div>
+          <div class="field"><label>確認者（帰園）</label><input id="f_out" placeholder="職員名"></div>
+        </div>
+        <div class="stay-info" id="stayInfo"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>内服薬の必要数（日数分のカウント補助）</h2>
+      <div class="body">
+        <div class="row" id="doseBox">
+          <label><input type="checkbox" class="dose" value="朝"> 朝食後</label>
+          <label><input type="checkbox" class="dose" value="昼"> 昼食後</label>
+          <label><input type="checkbox" class="dose" value="夕"> 夕食後</label>
+          <label><input type="checkbox" class="dose" value="寝る前"> 寝る前</label>
+        </div>
+        <div class="stay-info" id="doseInfo" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div class="sections" id="sections"></div>
+
+    <div class="card">
+      <h2>写真記録（任意）</h2>
+      <div class="body">
+        <div class="row">
+          <label class="btn sm">来園時の写真を追加<input type="file" accept="image/*" capture="environment" multiple hidden id="phIn"></label>
+          <label class="btn sm">帰園時の写真を追加<input type="file" accept="image/*" capture="environment" multiple hidden id="phOut"></label>
+        </div>
+        <div class="photos" id="photosIn"></div>
+        <div class="photos" id="photosOut"></div>
+        <p class="hint">写真はこのパソコンのブラウザ内にのみ保存され、外部に送信されません。紛失時の照合資料としてお使いください。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>連絡事項・メモ</h2>
+      <div class="body"><textarea class="memo" id="f_memo" placeholder="ご家族への連絡事項、紛失・破損の申し送りなど"></textarea></div>
+    </div>
+
+    <div class="row" style="margin-bottom:16px">
+      <button class="btn danger" id="btnDelete">この記録を削除</button>
+    </div>
+
+    <div class="summary">
+      <div class="stat">来園 <b id="sIn">0</b> 点</div>
+      <div class="stat">帰園 <b id="sOut">0</b> 点</div>
+      <div class="verdict pending" id="verdict"></div>
+      <button class="btn" id="btnPrint2">印刷</button>
+    </div>
+  </section>
+</main>
+
+<div id="print"></div>
+
+<script>
+"use strict";
+
+/* ================= 品目マスタ ================= */
+/* perNight: 1泊あたりの必要数（衣類のみ）。様式の注記どおり5泊以上は5着で頭打ち。 */
+const CATS = ["衣類等","洗面・静養道具等","薬","貴重品","その他","来園時の服"];
+
+const DEFAULT_ITEMS = [
+  {cat:"衣類等", name:"上衣類", unit:"着", perNight:1},
+  {cat:"衣類等", name:"下衣類", unit:"着", perNight:1},
+  {cat:"衣類等", name:"シャツ", unit:"着", perNight:1},
+  {cat:"衣類等", name:"ももひき", unit:"着", perNight:1},
+  {cat:"衣類等", name:"パンツ", unit:"枚", perNight:1, note:"※リハビリパンツ利用時は不要です"},
+  {cat:"衣類等", name:"靴下", unit:"足", perNight:1},
+  {cat:"衣類等", name:"上靴", unit:"足"},
+
+  {cat:"洗面・静養道具等", name:"義歯", unit:"", rem:["上","下","上・下","総義歯","部分","ケース有","ケース無"]},
+  {cat:"洗面・静養道具等", name:"歯ブラシ", unit:"本"},
+  {cat:"洗面・静養道具等", name:"歯磨き粉", unit:"個"},
+  {cat:"洗面・静養道具等", name:"割れない歯磨きコップ", unit:"個"},
+  {cat:"洗面・静養道具等", name:"義歯洗浄剤", unit:"個"},
+  {cat:"洗面・静養道具等", name:"クシ・ブラシ", unit:"本"},
+  {cat:"洗面・静養道具等", name:"髭剃り・充電器", unit:"", rem:["充電器有","キャップ有"]},
+
+  {cat:"薬", name:"定期薬", unit:"包", rem:["残薬有","残薬無"]},
+  {cat:"薬", name:"目薬", unit:"本"},
+  {cat:"薬", name:"塗り薬", unit:"本"},
+  {cat:"薬", name:"湿布", unit:"袋"},
+
+  {cat:"貴重品", name:"後期高齢者保険者証", unit:"枚"},
+  {cat:"貴重品", name:"現金（千円程度）", unit:"円", rem:["本人管理","施設管理"]},
+  {cat:"貴重品", name:"メガネ", unit:"個", rem:["ケース有","ケース無"]},
+  {cat:"貴重品", name:"補聴器", unit:"個", rem:["ケース有","ケース無"]},
+  {cat:"貴重品", name:"時計", unit:"個"},
+];
+
+/* 追加候補（施設で使われている入所時チェック表・家族記入用様式から採録） */
+const SUGGESTIONS = {
+  "衣類等":["パジャマ上下","長袖肌着","半袖肌着","羽織物","コート","ジャンパー","帽子","手袋","マフラー","外靴"],
+  "洗面・静養道具等":["フェイスタオル","バスタオル","洗面器","石鹸","義歯ケース","義歯ブラシ"],
+  "薬":["お薬手帳","坐薬","吸入器","その他外用薬"],
+  "貴重品":["介護保険証","負担割合証","負担限度額認定証","国民健康保険証","重度受給者証","診察券","指輪","ネックレス","携帯電話"],
+  "その他":["杖","車椅子","シルバーカー","タオルケット","毛布","おやつ・飲み物等","カバン・ポーチ","通院予約表"],
+  "来園時の服":["上着","ズボン","肌着","靴下","靴","上着（羽織物）"],
+};
+
+const NOTE = "下記表の衣類数は、1泊利用時に持参して頂きたい数になります。1泊分×日数分をご用意下さい。（3泊利用：上衣1着×3＝3着）5泊以上は全て5着でご用意ください。記入しているもの以外を持参されたい場合はご相談ください。";
+
+/* ================= 保存領域 ================= */
+const LS_KEY = "ss-mochimono/records";
+const load = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } };
+const save = rs => localStorage.setItem(LS_KEY, JSON.stringify(rs));
+
+let records = load();
+let cur = null;
+
+/* 写真は容量が大きいため IndexedDB に分離して保存する */
+const photoDB = (() => {
+  let dbp = null;
+  const open = () => dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open("ss-mochimono-photos", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("photos");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  const tx = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction("photos", mode);
+      const rq = fn(t.objectStore("photos"));
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    });
+  };
+  return {
+    get: id => tx("readonly", s => s.get(id)).catch(() => null),
+    put: (id, v) => tx("readwrite", s => s.put(v, id)).catch(() => null),
+    del: id => tx("readwrite", s => s.delete(id)).catch(() => null),
+  };
+})();
+
+/* ================= 計算 ================= */
+const nightsOf = r => {
+  if (!r.start || !r.end) return 0;
+  const d = (new Date(r.end) - new Date(r.start)) / 86400000;
+  return d > 0 ? Math.round(d) : 0;
+};
+/* 衣類は様式の注記どおり1泊分×泊数（5泊以上は5で頭打ち）、定期薬は服用回数×利用日数 */
+function needOf(item, r) {
+  const n = nightsOf(r);
+  if (item.perNight) return item.perNight * Math.min(Math.max(n, 1), 5);
+  if (item.name === "定期薬" && r.dose.length && n) return r.dose.length * (n + 1);
+  return null;
+}
+
+const num = v => (v === "" || v == null || isNaN(v)) ? null : Number(v);
+
+const stateOf = row => {
+  const a = num(row.qtyIn), b = num(row.qtyOut);
+  if (a == null && b == null) return "blank";
+  if (a == null || b == null) return "pending";
+  return a === b ? "matched" : "diff";
+};
+
+/* ================= 記録の生成 ================= */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function newRecord(base) {
+  const items = (base?.items ?? DEFAULT_ITEMS).map(i => ({
+    key: uid(), cat: i.cat, name: i.name, unit: i.unit ?? "",
+    perNight: i.perNight, note: i.note, rem: i.rem,
+    qtyIn: "", qtyOut: "", remark: "",
+  }));
+  return {
+    id: uid(), name: base?.name ?? "", office: base?.office ?? "",
+    start: "", end: "", wish: "希望する", staffIn: "", staffOut: "",
+    dose: base?.dose ? [...base.dose] : [], memo: "",
+    photosIn: [], photosOut: [], items,
+    updatedAt: Date.now(),
+  };
+}
+
+const persist = () => {
+  if (!cur) return;
+  cur.updatedAt = Date.now();
+  const i = records.findIndex(r => r.id === cur.id);
+  if (i < 0) records.unshift(cur); else records[i] = cur;
+  save(records);
+};
+
+/* ================= 画面切替 ================= */
+const $ = s => document.querySelector(s);
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  kids.flat().forEach(k => k != null && n.append(k));
+  return n;
+};
+
+function show(view) {
+  $("#viewList").hidden = view !== "list";
+  $("#viewEdit").hidden = view !== "edit";
+  window.scrollTo(0, 0);
+}
+
+/* ================= 一覧 ================= */
+function renderList() {
+  const q = $("#q").value.trim();
+  const box = $("#recs");
+  box.textContent = "";
+  const hits = records
+    .filter(r => !q || (r.name + r.office).includes(q))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+
+  if (!hits.length) {
+    box.append(el("div", {className: "empty", textContent: records.length ? "該当する記録がありません。" : "記録がありません。「新規作成」から始めてください。"}));
+    return;
+  }
+  for (const r of hits) {
+    const diffs = r.items.filter(i => stateOf(i) === "diff").length;
+    const done = r.items.some(i => num(i.qtyOut) != null);
+    const badge = diffs ? el("span", {className: "badge ng", textContent: `差異 ${diffs} 件`})
+      : done ? el("span", {className: "badge done", textContent: "照合済"})
+      : el("span", {className: "badge stay", textContent: "利用中"});
+    box.append(el("div", {className: "rec", onclick: () => openRecord(r.id)},
+      el("span", {className: "nm", textContent: r.name || "（氏名未入力）"}),
+      el("span", {className: "pd", textContent:
+        [r.office, r.start && r.end ? `${r.start} 〜 ${r.end}（${nightsOf(r)}泊）` : "期間未設定"].filter(Boolean).join("　")}),
+      badge));
+  }
+}
+
+/* ================= 編集 ================= */
+async function openRecord(id) {
+  cur = records.find(r => r.id === id);
+  if (!cur) return;
+  cur.photosIn = (await photoDB.get(cur.id + ":in")) ?? [];
+  cur.photosOut = (await photoDB.get(cur.id + ":out")) ?? [];
+  fillForm();
+  renderSections();
+  renderPhotos();
+  show("edit");
+}
+
+function fillForm() {
+  $("#f_name").value = cur.name;
+  $("#f_office").value = cur.office;
+  $("#f_start").value = cur.start;
+  $("#f_end").value = cur.end;
+  $("#f_wish").value = cur.wish;
+  $("#f_in").value = cur.staffIn;
+  $("#f_out").value = cur.staffOut;
+  $("#f_memo").value = cur.memo;
+  document.querySelectorAll(".dose").forEach(c => c.checked = cur.dose.includes(c.value));
+  renderStayInfo();
+}
+
+function renderStayInfo() {
+  const n = nightsOf(cur);
+  const cap = Math.min(Math.max(n, 1), 5);
+  $("#stayInfo").innerHTML = n
+    ? `利用期間 <b>${n}</b> 泊 <b>${n + 1}</b> 日　／　衣類の目安数 ＝ 1泊分 × <b>${cap}</b>${n > 5 ? "（5泊以上は5着で頭打ち）" : ""}`
+    : "利用開始日と終了日を入力すると、衣類の必要数と内服の必要包数を自動計算します。";
+
+  const times = cur.dose.length, days = n ? n + 1 : 0;
+  $("#doseInfo").innerHTML = (times && days)
+    ? `1日 <b>${times}</b> 回 × <b>${days}</b> 日 ＝ 必要 <b>${times * days}</b> 包（回分）。来園時にこの数だけ揃っているか数えてください。`
+    : "服用のタイミングを選ぶと、利用日数分の必要包数を計算します。";
+}
+
+function renderSections() {
+  const wrap = $("#sections");
+  wrap.textContent = "";
+
+  for (const cat of CATS) {
+    const tbody = el("tbody");
+    const card = el("div", {className: "card"},
+      el("h2", {textContent: cat}),
+      el("table", {className: "items"},
+        el("thead", {}, el("tr", {},
+          el("th", {className: "col-name", textContent: "物品", style: "text-align:left; padding-left:6px"}),
+          el("th", {className: "col-need", textContent: "目安"}),
+          el("th", {className: "col-qty", textContent: "来園"}),
+          el("th", {className: "col-qty", textContent: "帰園"}),
+          el("th", {className: "col-rem", textContent: "備考"}),
+          el("th", {className: "col-act"}))),
+        tbody));
+
+    cur.items.filter(i => i.cat === cat).forEach(item => tbody.append(itemRow(item)));
+
+    const body = el("div", {className: "body", style: "padding:0 10px 10px"});
+    const chips = el("div", {className: "chips"});
+    (SUGGESTIONS[cat] ?? []).forEach(nm => {
+      if (cur.items.some(i => i.cat === cat && i.name === nm)) return;
+      chips.append(el("button", {className: "chip", textContent: "＋ " + nm,
+        onclick: () => addItem(cat, nm)}));
+    });
+    const inp = el("input", {placeholder: "その他の品目を入力", onkeydown: e => {
+      if (e.key === "Enter" && inp.value.trim()) { addItem(cat, inp.value.trim()); }
+    }});
+    body.append(chips, el("div", {className: "add-line"}, inp,
+      el("button", {className: "btn sm", textContent: "追加",
+        onclick: () => inp.value.trim() && addItem(cat, inp.value.trim())})));
+    card.append(body);
+    wrap.append(card);
+  }
+  renderSummary();
+}
+
+function itemRow(item) {
+  const need = needOf(item, cur);
+  const tr = el("tr");
+  const dl = item.rem ? "dl-" + item.key : null;
+
+  const qty = which => el("input", {className: "qty", value: item[which], inputMode: "decimal",
+    oninput: e => { item[which] = e.target.value; markRow(tr, item); renderSummary(); persist(); }});
+
+  const remark = el("input", {className: "rem", value: item.remark,
+    oninput: e => { item.remark = e.target.value; persist(); }});
+  if (dl) remark.setAttribute("list", dl);
+
+  tr.append(
+    el("td", {}, el("span", {className: "item-name", textContent: item.name + (item.unit ? `（${item.unit}）` : "")}),
+      item.note ? el("small", {className: "item-note", textContent: item.note}) : null),
+    el("td", {className: "need", innerHTML: need ? `<b>${need}</b>` : "—"}),
+    el("td", {}, qty("qtyIn")),
+    el("td", {}, qty("qtyOut")),
+    el("td", {}, remark,
+      item.rem ? el("datalist", {id: dl}, item.rem.map(v => el("option", {value: v}))) : null),
+    el("td", {}, el("button", {className: "x", textContent: "×", title: "この行を削除",
+      onclick: () => { cur.items = cur.items.filter(i => i.key !== item.key); persist(); renderSections(); }})));
+
+  markRow(tr, item);
+  return tr;
+}
+
+const markRow = (tr, item) => { tr.className = ""; const s = stateOf(item); if (s === "diff" || s === "matched") tr.classList.add(s); };
+
+function addItem(cat, name) {
+  const preset = [...DEFAULT_ITEMS].find(i => i.name === name) ?? {};
+  cur.items.push({key: uid(), cat, name, unit: preset.unit ?? "", perNight: preset.perNight,
+    note: preset.note, rem: preset.rem, qtyIn: "", qtyOut: "", remark: ""});
+  persist();
+  renderSections();
+}
+
+function renderSummary() {
+  const rows = cur.items;
+  const sum = w => rows.reduce((a, i) => a + (num(i[w]) ?? 0), 0);
+  $("#sIn").textContent = sum("qtyIn");
+  $("#sOut").textContent = sum("qtyOut");
+
+  const diffs = rows.filter(i => stateOf(i) === "diff");
+  const pending = rows.filter(i => stateOf(i) === "pending");
+  const v = $("#verdict");
+  if (diffs.length) {
+    v.className = "verdict ng";
+    v.textContent = `差異 ${diffs.length} 件：${diffs.map(i => i.name).join("、")}　→ ご家族へ説明・申し送りが必要です`;
+  } else if (pending.length) {
+    v.className = "verdict pending";
+    v.textContent = `帰園時の数量が未入力：${pending.length} 件`;
+  } else if (rows.some(i => stateOf(i) === "matched")) {
+    v.className = "verdict ok";
+    v.textContent = "入退所時の数量に増減はありません。ご家族へその旨をお伝えください。";
+  } else {
+    v.className = "verdict pending";
+    v.textContent = "来園時の数量を入力してください。";
+  }
+}
+
+/* ================= 写真 ================= */
+function renderPhotos() {
+  for (const [key, box] of [["photosIn", $("#photosIn")], ["photosOut", $("#photosOut")]]) {
+    box.textContent = "";
+    cur[key].forEach((src, idx) => box.append(el("div", {className: "ph"},
+      el("img", {src}),
+      el("button", {textContent: "×", onclick: () => {
+        cur[key].splice(idx, 1);
+        photoDB.put(cur.id + (key === "photosIn" ? ":in" : ":out"), cur[key]);
+        renderPhotos();
+      }}))));
+  }
+}
+
+function shrink(file) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const c = el("canvas", {width: Math.round(img.width * s), height: Math.round(img.height * s)});
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL("image/jpeg", 0.75));
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function onPhotos(input, key) {
+  for (const f of input.files) cur[key].push(await shrink(f));
+  input.value = "";
+  await photoDB.put(cur.id + (key === "photosIn" ? ":in" : ":out"), cur[key]);
+  renderPhotos();
+}
+
+/* ================= 印刷 ================= */
+function buildPrint() {
+  const n = nightsOf(cur);
+  const col = cats => cats.map(cat => {
+    const rows = cur.items.filter(i => i.cat === cat);
+    if (!rows.length) return "";
+    // 縦書きの分類名が行数に収まらないと切れるため、行数に応じて文字サイズを詰める
+    const fit = Math.max(6, Math.min(10, (rows.length + 1) * 17 / (cat.length * 1.35)));
+    return `<table class="pt"><tr>
+      <th rowspan="${rows.length + 1}" class="p-cat" style="font-size:${fit.toFixed(1)}px">${cat}</th>
+      <th style="width:40%">物品</th><th style="width:13%">目安</th>
+      <th style="width:13%">来園</th><th style="width:13%">帰園</th><th>備考</th></tr>
+      ${rows.map(i => {
+        const need = needOf(i, cur);
+        const d = stateOf(i) === "diff" ? ' class="p-diff"' : "";
+        return `<tr${d}><td>${esc(i.name)}${i.unit ? `（${esc(i.unit)}）` : ""}</td>
+          <td style="text-align:center">${need ?? ""}</td>
+          <td style="text-align:center">${esc(i.qtyIn)}</td>
+          <td style="text-align:center">${esc(i.qtyOut)}</td>
+          <td>${esc(i.remark)}</td></tr>`;
+      }).join("")}
+    </table><div style="height:4px"></div>`;
+  }).join("");
+
+  const diffs = cur.items.filter(i => stateOf(i) === "diff");
+  $("#print").innerHTML = `
+    <div class="p-title">● ショートステイ入所時持ち物確認表</div>
+    <div class="p-head">
+      <span>${cur.start || "　　　"} 〜 ${cur.end || "　　　"}（${n}泊${n + 1}日）　事業所：${esc(cur.office)}</span>
+      <span>利用者氏名：<b>${esc(cur.name)}</b>　様</span>
+    </div>
+    <div class="p-note">※${NOTE}<br>※施設での荷物確認：<b>${esc(cur.wish)}</b>${
+      cur.dose.length && n ? `　／　内服：1日${cur.dose.length}回（${cur.dose.join("・")}）× ${n + 1}日 ＝ ${cur.dose.length * (n + 1)}包` : ""}</div>
+    <div class="p-cols">
+      <div>${col(["衣類等", "洗面・静養道具等"])}</div>
+      <div>${col(["薬", "貴重品", "その他", "来園時の服"])}</div>
+    </div>
+    <div class="p-memo"><b>連絡事項</b>　${esc(cur.memo).replace(/\n/g, "<br>")}${
+      diffs.length ? `<br><b>【数量差異】</b>${diffs.map(i =>
+        `${esc(i.name)}：来園 ${esc(i.qtyIn)} → 帰園 ${esc(i.qtyOut)}`).join("／")}` : ""}</div>
+    <div class="p-foot"><span>確認者　来園：${esc(cur.staffIn) || "　　　　　　"}</span>
+      <span>帰園：${esc(cur.staffOut) || "　　　　　　"}</span>
+      <span>入退所時の数量に増減：${diffs.length ? "有（上記のとおり）" : "無"}</span></div>`;
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+
+function doPrint() {
+  if (!cur) { alert("印刷する記録を開いてください。"); return; }
+  buildPrint();
+  window.print();
+}
+
+/* ================= バックアップ ================= */
+function backup() {
+  const blob = new Blob([JSON.stringify({records}, null, 2)], {type: "application/json"});
+  const a = el("a", {href: URL.createObjectURL(blob),
+    download: `持ち物確認_バックアップ_${new Date().toISOString().slice(0, 10)}.json`});
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function restore(file) {
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const data = JSON.parse(fr.result);
+      if (!Array.isArray(data.records)) throw 0;
+      const ids = new Set(records.map(r => r.id));
+      const add = data.records.filter(r => !ids.has(r.id));
+      records = [...records, ...add];
+      save(records);
+      renderList();
+      alert(`${add.length} 件の記録を取り込みました。`);
+    } catch { alert("バックアップファイルを読み込めませんでした。"); }
+  };
+  fr.readAsText(file);
+}
+
+/* ================= イベント ================= */
+const bindText = (sel, key) => $(sel).addEventListener("input", e => {
+  cur[key] = e.target.value;
+  persist();
+  if (key === "start" || key === "end") { renderStayInfo(); renderSections(); }
+});
+["#f_name:name", "#f_office:office", "#f_start:start", "#f_end:end",
+ "#f_wish:wish", "#f_in:staffIn", "#f_out:staffOut", "#f_memo:memo"]
+  .forEach(s => { const [sel, key] = s.split(":"); bindText(sel, key); });
+
+$("#doseBox").addEventListener("change", () => {
+  cur.dose = [...document.querySelectorAll(".dose")].filter(c => c.checked).map(c => c.value);
+  renderStayInfo();
+  renderSections();
+  persist();
+});
+
+$("#phIn").addEventListener("change", e => onPhotos(e.target, "photosIn"));
+$("#phOut").addEventListener("change", e => onPhotos(e.target, "photosOut"));
+
+const startNew = () => {
+  const name = prompt("利用者氏名を入力してください。\n過去に利用のある方は、前回の持ち物構成を引き継ぎます。", "");
+  if (name === null) return;
+  const prev = records.filter(r => r.name === name.trim() && name.trim())
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  cur = newRecord(prev ? {...prev, name: name.trim()} : null);
+  cur.name = name.trim();
+  persist();
+  fillForm();
+  renderSections();
+  renderPhotos();
+  show("edit");
+};
+
+$("#btnNew").onclick = startNew;
+$("#btnNew2").onclick = startNew;
+$("#btnList").onclick = () => { renderList(); show("list"); };
+$("#btnPrint").onclick = doPrint;
+$("#btnPrint2").onclick = doPrint;
+$("#q").oninput = renderList;
+
+$("#btnDelete").onclick = () => {
+  if (!confirm(`「${cur.name || "この記録"}」を削除します。よろしいですか？`)) return;
+  records = records.filter(r => r.id !== cur.id);
+  save(records);
+  photoDB.del(cur.id + ":in");
+  photoDB.del(cur.id + ":out");
+  cur = null;
+  renderList();
+  show("list");
+};
+
+$("#btnBackup").onclick = () => {
+  if (confirm("書き出しは「OK」、バックアップの取り込みは「キャンセル」を選んでください。")) { backup(); return; }
+  const f = el("input", {type: "file", accept: "application/json",
+    onchange: e => e.target.files[0] && restore(e.target.files[0])});
+  f.click();
+};
+
+renderList();
+show("list");
+</script>
+</body>
+</html>
