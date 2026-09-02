@@ -211,7 +211,13 @@ textarea.memo{
           <div class="field"><label>利用者氏名</label><input id="f_name" placeholder="お名前"></div>
           <div class="field"><label>事業所</label><input id="f_office" placeholder="施設・事業所名"></div>
           <div class="field"><label>利用開始日（来園）</label><input id="f_start" type="date"></div>
+          <div class="field"><label>来園日は何食目から</label>
+            <select id="f_sslot"><option value="朝">朝食後から</option><option value="昼">昼食後から</option><option value="夕">夕食後から</option></select>
+          </div>
           <div class="field"><label>利用終了日（帰園）</label><input id="f_end" type="date"></div>
+          <div class="field"><label>帰園日は何食目まで</label>
+            <select id="f_eslot"><option value="朝">朝食後まで</option><option value="昼">昼食後まで</option><option value="夕">夕食後まで</option></select>
+          </div>
           <div class="field"><label>施設での荷物確認</label>
             <select id="f_wish"><option value="希望する">希望する</option><option value="希望しない">希望しない</option></select>
           </div>
@@ -357,11 +363,41 @@ const nightsOf = r => {
   const d = (new Date(r.end) - new Date(r.start)) / 86400000;
   return d > 0 ? Math.round(d) : 0;
 };
-/* 衣類は様式の注記どおり1泊分×泊数（5泊以上は5で頭打ち）、定期薬は服用回数×利用日数 */
+/* 服用タイミングの時系列順。来園日・帰園日は半日のため、この順序で服用の要否を判定する */
+const SLOTS = ["朝", "昼", "夕", "寝る前"];
+const slotIdx = s => SLOTS.indexOf(s);
+
+/* 内服の必要包数。来園日は「何食目から」以降、帰園日は「何食目まで」だけを数える。
+   帰園日の「寝る前」はご自宅で服用されるため含めない。 */
+function doseCount(r) {
+  const n = nightsOf(r);
+  if (!r.dose.length || !r.start || !r.end) return null;
+  const si = slotIdx(r.sslot), ei = slotIdx(r.eslot);
+  const idx = r.dose.map(slotIdx);
+
+  if (n === 0) {                                   // 日帰り（同日中）
+    const only = idx.filter(i => i >= si && i <= ei).length;
+    return {total: only, parts: [`当日 ${only}回`]};
+  }
+  const first = idx.filter(i => i >= si).length;    // 来園日
+  const last = idx.filter(i => i <= ei).length;     // 帰園日
+  const midDays = n - 1;                            // 中日（丸1日）
+  const mid = midDays * r.dose.length;
+  return {
+    total: first + mid + last,
+    parts: [
+      `来園日 ${first}回`,
+      ...(midDays > 0 ? [`中日 ${midDays}日×${r.dose.length}回＝${mid}回`] : []),
+      `帰園日 ${last}回`,
+    ],
+  };
+}
+
+/* 衣類は様式の注記どおり1泊分×泊数（5泊以上は5で頭打ち）、定期薬は上記の必要包数 */
 function needOf(item, r) {
   const n = nightsOf(r);
   if (item.perNight) return item.perNight * Math.min(Math.max(n, 1), 5);
-  if (item.name === "定期薬" && r.dose.length && n) return r.dose.length * (n + 1);
+  if (item.name === "定期薬") return doseCount(r)?.total ?? null;
   return null;
 }
 
@@ -385,7 +421,8 @@ function newRecord(base) {
   }));
   return {
     id: uid(), name: base?.name ?? "", office: base?.office ?? "",
-    start: "", end: "", wish: "希望する", staffIn: "", staffOut: "",
+    start: "", end: "", sslot: "朝", eslot: "夕",
+    wish: "希望する", staffIn: "", staffOut: "",
     dose: base?.dose ? [...base.dose] : [], memo: "",
     photosIn: [], photosOut: [], items,
     updatedAt: Date.now(),
@@ -458,6 +495,8 @@ function fillForm() {
   $("#f_office").value = cur.office;
   $("#f_start").value = cur.start;
   $("#f_end").value = cur.end;
+  $("#f_sslot").value = cur.sslot;
+  $("#f_eslot").value = cur.eslot;
   $("#f_wish").value = cur.wish;
   $("#f_in").value = cur.staffIn;
   $("#f_out").value = cur.staffOut;
@@ -473,10 +512,11 @@ function renderStayInfo() {
     ? `利用期間 <b>${n}</b> 泊 <b>${n + 1}</b> 日　／　衣類の目安数 ＝ 1泊分 × <b>${cap}</b>${n > 5 ? "（5泊以上は5着で頭打ち）" : ""}`
     : "利用開始日と終了日を入力すると、衣類の必要数と内服の必要包数を自動計算します。";
 
-  const times = cur.dose.length, days = n ? n + 1 : 0;
-  $("#doseInfo").innerHTML = (times && days)
-    ? `1日 <b>${times}</b> 回 × <b>${days}</b> 日 ＝ 必要 <b>${times * days}</b> 包（回分）。来園時にこの数だけ揃っているか数えてください。`
-    : "服用のタイミングを選ぶと、利用日数分の必要包数を計算します。";
+  const d = doseCount(cur);
+  $("#doseInfo").innerHTML = d
+    ? `${d.parts.join("　＋　")}　＝　必要 <b>${d.total}</b> 包（回分）<br>
+       <span style="font-size:13px;color:var(--muted)">来園日は${cur.sslot}食後から、帰園日は${cur.eslot}食後まで。帰園日の「寝る前」はご自宅での服用のため含めていません。</span>`
+    : "服用のタイミングと利用期間を入れると、来園日・帰園日の食事回数まで数えて必要包数を計算します。";
 }
 
 function renderSections() {
@@ -639,14 +679,15 @@ function buildPrint() {
   }).join("");
 
   const diffs = cur.items.filter(i => stateOf(i) === "diff");
+  const dose = doseCount(cur);
   $("#print").innerHTML = `
     <div class="p-title">● ショートステイ入所時持ち物確認表</div>
     <div class="p-head">
-      <span>${cur.start || "　　　"} 〜 ${cur.end || "　　　"}（${n}泊${n + 1}日）　事業所：${esc(cur.office)}</span>
+      <span>${cur.start || "　　　"}（${esc(cur.sslot)}食後）〜 ${cur.end || "　　　"}（${esc(cur.eslot)}食後）　${n}泊${n + 1}日　事業所：${esc(cur.office)}</span>
       <span>利用者氏名：<b>${esc(cur.name)}</b>　様</span>
     </div>
     <div class="p-note">※${NOTE}<br>※施設での荷物確認：<b>${esc(cur.wish)}</b>${
-      cur.dose.length && n ? `　／　内服：1日${cur.dose.length}回（${cur.dose.join("・")}）× ${n + 1}日 ＝ ${cur.dose.length * (n + 1)}包` : ""}</div>
+      dose ? `　／　内服（${cur.dose.join("・")}）：${dose.parts.join(" ＋ ")} ＝ <b>${dose.total}包</b>` : ""}</div>
     <div class="p-cols">
       <div>${col(["衣類等", "洗面・整容道具等"])}</div>
       <div>${col(["薬", "貴重品", "その他", "来園時の服"])}</div>
@@ -697,9 +738,10 @@ function restore(file) {
 const bindText = (sel, key) => $(sel).addEventListener("input", e => {
   cur[key] = e.target.value;
   persist();
-  if (key === "start" || key === "end") { renderStayInfo(); renderSections(); }
+  if (["start", "end", "sslot", "eslot"].includes(key)) { renderStayInfo(); renderSections(); }
 });
 ["#f_name:name", "#f_office:office", "#f_start:start", "#f_end:end",
+ "#f_sslot:sslot", "#f_eslot:eslot",
  "#f_wish:wish", "#f_in:staffIn", "#f_out:staffOut", "#f_memo:memo"]
   .forEach(s => { const [sel, key] = s.split(":"); bindText(sel, key); });
 
