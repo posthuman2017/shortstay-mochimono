@@ -157,6 +157,57 @@ textarea.memo{
   width:100%; min-height:74px; padding:9px; border:1px solid var(--line);
   border-radius:6px; resize:vertical;
 }
+.ph .mk{
+  position:absolute; left:2px; bottom:2px; background:rgba(11,107,94,.85); color:#fff;
+  font-size:11px; border-radius:4px; padding:0 6px; pointer-events:none;
+}
+
+/* ---------- 写真で数える（タップ計数） ---------- */
+#counter{position:fixed; inset:0; z-index:60; background:rgba(13,22,30,.96); display:flex; flex-direction:column}
+#counter[hidden]{display:none}
+.cnt-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 14px; color:#fff}
+.cnt-head b{font-size:15px}
+.cnt-head .pages{font-size:13px; opacity:.85; min-width:44px; text-align:center}
+.cnt-head .spacer{flex:1}
+.cnt-head button{
+  border:1px solid rgba(255,255,255,.4); background:transparent; color:#fff;
+  border-radius:6px; padding:6px 12px; font-size:13px;
+}
+.cnt-head button:hover{background:rgba(255,255,255,.14)}
+.cnt-body{flex:1; display:flex; gap:12px; padding:0 14px 14px; min-height:0}
+.cnt-photo{flex:1; overflow:auto; border-radius:8px; background:#000; display:grid; place-items:center}
+.cnt-wrap{position:relative}
+.cnt-wrap img{display:block; max-width:calc(100vw - 352px); max-height:calc(100vh - 84px)}
+.cnt-wrap .lay{position:absolute; inset:0; cursor:crosshair}
+.cnt-empty{color:#9fb0ba; padding:60px 20px; font-size:14px}
+.mark{
+  position:absolute; width:22px; height:22px; border-radius:50%;
+  border:2px solid #fff; transform:translate(-50%,-50%);
+  color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center;
+  cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.55); user-select:none;
+}
+.cnt-panel{
+  width:300px; background:#fff; border-radius:8px; padding:12px;
+  display:flex; flex-direction:column; gap:10px; overflow:auto;
+}
+.cnt-panel select{width:100%; padding:8px; border:1px solid var(--line); border-radius:6px}
+.cnt-count{text-align:center; font-size:13px; color:var(--muted)}
+.cnt-count b{display:block; font-size:38px; line-height:1.15; color:var(--text)}
+.cnt-legend{flex:1; overflow:auto; border-top:1px solid var(--line2); padding-top:8px; min-height:60px}
+.cnt-legend .lg{
+  display:flex; align-items:center; gap:8px; padding:4px 6px;
+  border-radius:6px; cursor:pointer; font-size:13px;
+}
+.cnt-legend .lg:hover{background:#f2f5f7}
+.cnt-legend .lg.sel{background:var(--accent-soft)}
+.cnt-legend .dot{width:13px; height:13px; border-radius:50%; border:1px solid rgba(0,0,0,.2); flex:none}
+.cnt-legend .lg b{margin-left:auto}
+.cnt-hint{font-size:12px; color:var(--muted); line-height:1.5}
+@media(max-width:760px){
+  .cnt-body{flex-direction:column}
+  .cnt-panel{width:auto; max-height:46%}
+  .cnt-wrap img{max-width:calc(100vw - 44px); max-height:44vh}
+}
 
 /* ---------- 印刷 ---------- */
 #print{display:none}
@@ -244,15 +295,18 @@ textarea.memo{
     <div class="sections" id="sections"></div>
 
     <div class="card">
-      <h2>写真記録（任意）</h2>
+      <h2>写真記録・写真で数える（任意）</h2>
       <div class="body">
         <div class="row">
           <label class="btn sm">来園時の写真を追加<input type="file" accept="image/*" capture="environment" multiple hidden id="phIn"></label>
           <label class="btn sm">帰園時の写真を追加<input type="file" accept="image/*" capture="environment" multiple hidden id="phOut"></label>
+          <button class="btn sm primary" id="btnCntIn">来園の荷物を数える</button>
+          <button class="btn sm primary" id="btnCntOut">帰園の荷物を数える</button>
         </div>
         <div class="photos" id="photosIn"></div>
         <div class="photos" id="photosOut"></div>
-        <p class="hint">写真はこのパソコンのブラウザ内にのみ保存され、外部に送信されません。紛失時の照合資料としてお使いください。</p>
+        <p class="hint">写真はこのパソコンのブラウザ内にのみ保存され、外部に送信されません。紛失時の照合資料としてお使いください。<br>
+        「荷物を数える」では、写真の上の品物を1つずつタップすると個数が数えられ、来園・帰園の入力欄へまとめて反映できます（自動判定は行いません）。</p>
       </div>
     </div>
 
@@ -273,6 +327,36 @@ textarea.memo{
     </div>
   </section>
 </main>
+
+<!-- ============ 写真で数える（タップ計数）オーバーレイ ============ -->
+<div id="counter" hidden>
+  <div class="cnt-head">
+    <b id="cntTitle">写真で数える</b>
+    <button id="cntPrev" title="前の写真">◀</button>
+    <span class="pages" id="cntPages">0/0</span>
+    <button id="cntNext" title="次の写真">▶</button>
+    <button id="cntAdd">写真を追加</button>
+    <span class="spacer"></span>
+    <button id="cntClose">閉じる</button>
+  </div>
+  <div class="cnt-body">
+    <div class="cnt-photo" id="cntPhoto"></div>
+    <div class="cnt-panel">
+      <div>
+        <label style="font-size:12px;color:var(--muted)">数える品目を選ぶ</label>
+        <select id="cntItem"></select>
+      </div>
+      <div class="cnt-count" id="cntCount"><b>0</b>品目を選んで、写真の品物を1つずつタップ</div>
+      <div class="row" style="gap:6px">
+        <button class="btn sm" id="cntUndo">1つ戻す</button>
+        <button class="btn sm" id="cntClear">この品目をやり直す</button>
+      </div>
+      <div class="cnt-legend" id="cntLegend"></div>
+      <p class="cnt-hint">タップした点には品目ごとの色の丸が付きます。丸をタップすると取り消せます。数えた個数はマーカー付き写真とともに保存され、照合の根拠になります。</p>
+      <button class="btn primary" id="cntApply">数えた結果を入力欄へ反映</button>
+    </div>
+  </div>
+</div>
 
 <div id="print"></div>
 
@@ -479,11 +563,17 @@ function renderList() {
 }
 
 /* ================= 編集 ================= */
+/* 旧版は写真をデータURL文字列で保存していたため、マーカー付きの形式 {src, marks} に揃える。
+   座標が数値でないマークは表示できないため取り除く */
+const normPhotos = a => (a ?? [])
+  .map(p => typeof p === "string" ? {src: p, marks: []} : p)
+  .map(p => ({src: p.src, marks: (p.marks ?? []).filter(m => isFinite(m.x) && isFinite(m.y))}));
+
 async function openRecord(id) {
   cur = records.find(r => r.id === id);
   if (!cur) return;
-  cur.photosIn = (await photoDB.get(cur.id + ":in")) ?? [];
-  cur.photosOut = (await photoDB.get(cur.id + ":out")) ?? [];
+  cur.photosIn = normPhotos(await photoDB.get(cur.id + ":in"));
+  cur.photosOut = normPhotos(await photoDB.get(cur.id + ":out"));
   fillForm();
   renderSections();
   renderPhotos();
@@ -620,14 +710,23 @@ function renderSummary() {
 }
 
 /* ================= 写真 ================= */
+const phaseKey = phase => phase === "in" ? "photosIn" : "photosOut";
+const phaseLabel = phase => phase === "in" ? "来園時" : "帰園時";
+const savePhotos = phase => photoDB.put(cur.id + ":" + phase, cur[phaseKey(phase)]);
+
 function renderPhotos() {
-  for (const [key, box] of [["photosIn", $("#photosIn")], ["photosOut", $("#photosOut")]]) {
+  for (const phase of ["in", "out"]) {
+    const key = phaseKey(phase);
+    const box = $(phase === "in" ? "#photosIn" : "#photosOut");
     box.textContent = "";
-    cur[key].forEach((src, idx) => box.append(el("div", {className: "ph"},
-      el("img", {src}),
-      el("button", {textContent: "×", onclick: () => {
+    cur[key].forEach((p, idx) => box.append(el("div", {className: "ph", title: "タップすると写真の上で数えられます",
+      onclick: () => openCounter(phase, idx)},
+      el("img", {src: p.src}),
+      p.marks.length ? el("span", {className: "mk", textContent: `${p.marks.length}点`}) : null,
+      el("button", {textContent: "×", onclick: e => {
+        e.stopPropagation();
         cur[key].splice(idx, 1);
-        photoDB.put(cur.id + (key === "photosIn" ? ":in" : ":out"), cur[key]);
+        savePhotos(phase);
         renderPhotos();
       }}))));
   }
@@ -647,11 +746,153 @@ function shrink(file) {
   });
 }
 
-async function onPhotos(input, key) {
-  for (const f of input.files) cur[key].push(await shrink(f));
+async function onPhotos(input, phase) {
+  const key = phaseKey(phase);
+  for (const f of input.files) cur[key].push({src: await shrink(f), marks: []});
   input.value = "";
-  await photoDB.put(cur.id + (key === "photosIn" ? ":in" : ":out"), cur[key]);
+  await savePhotos(phase);
   renderPhotos();
+  /* 「数える」から撮影を促した場合や、計数画面を開いたまま追加した場合は、その写真を開く */
+  const reopen = pendingCount === phase || (!$("#counter").hidden && cnt.phase === phase);
+  pendingCount = null;
+  if (reopen) openCounter(phase, cur[key].length - 1);
+}
+
+/* ================= 写真で数える（タップ計数） =================
+   AIによる自動判定は行わない。職員が写真の品物を1つずつタップして数え、
+   その個数を来園・帰園の入力欄へ反映する。マーカー付き写真は照合の根拠として残る。 */
+const PALETTE = ["#e05252", "#2f7fd4", "#28a06a", "#e08e2b", "#8e5bd4",
+                 "#d44f9e", "#3aa9b8", "#97a326", "#b06a4f", "#5b6bd4"];
+const itemColor = k => PALETTE[Math.max(0, cur.items.findIndex(i => i.key === k)) % PALETTE.length];
+
+const cnt = {phase: "in", idx: 0, itemKey: null};
+let pendingCount = null;
+
+/* そのフェーズ（来園/帰園）の全写真を合算した、品目ごとのマーク数 */
+const totalFor = (key, phase) =>
+  cur[phaseKey(phase)].reduce((a, p) => a + p.marks.filter(m => m.k === key).length, 0);
+
+function openCounter(phase, idx = 0) {
+  const photos = cur[phaseKey(phase)];
+  if (!photos.length) {                       // 写真がなければ、まず撮影・追加してもらう
+    pendingCount = phase;
+    $(phase === "in" ? "#phIn" : "#phOut").click();
+    return;
+  }
+  cnt.phase = phase;
+  cnt.idx = Math.min(Math.max(idx, 0), photos.length - 1);
+  if (!cur.items.some(i => i.key === cnt.itemKey)) cnt.itemKey = cur.items[0]?.key ?? null;
+
+  /* 品目セレクト（分類ごと）。品目は計数画面を開いている間は変わらない */
+  const sel = $("#cntItem");
+  sel.textContent = "";
+  for (const cat of CATS) {
+    const rows = cur.items.filter(i => i.cat === cat);
+    if (!rows.length) continue;
+    const og = el("optgroup", {label: cat});
+    rows.forEach(i => og.append(el("option", {value: i.key, textContent: i.name})));
+    sel.append(og);
+  }
+  if (cnt.itemKey) sel.value = cnt.itemKey;
+
+  $("#counter").hidden = false;
+  renderCounter();
+}
+
+function closeCounter() {
+  $("#counter").hidden = true;
+  cnt.lay = null;
+  renderPhotos();                             // サムネイルのマーク数バッジを更新
+}
+
+/* 写真の表示。ページ送り・開いた時だけ呼ぶ。
+   タップのたびに <img> を作り直すと、読み込みが済むまでの連打が落ちるため、
+   タップ時はマーカー層と右パネルだけを更新する（renderMarks / renderPanel）。 */
+function renderCounter() {
+  const photos = cur[phaseKey(cnt.phase)];
+  const p = photos[cnt.idx];
+  $("#cntTitle").textContent = `写真で数える（${phaseLabel(cnt.phase)}）`;
+  $("#cntPages").textContent = `${photos.length ? cnt.idx + 1 : 0}/${photos.length}枚`;
+
+  const box = $("#cntPhoto");
+  box.textContent = "";
+  cnt.lay = null;
+  if (!p) {
+    box.append(el("div", {className: "cnt-empty", textContent: "写真がありません。「写真を追加」から撮影してください。"}));
+  } else {
+    const lay = el("div", {className: "lay", onclick: e => {
+      if (!cnt.itemKey) { alert("先に、数える品目を選んでください。"); return; }
+      const r = lay.getBoundingClientRect();
+      if (!r.width || !r.height) return;      // 画像の表示前は座標が取れないため無視
+      p.marks.push({x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, k: cnt.itemKey});
+      savePhotos(cnt.phase);
+      renderMarks();
+      renderPanel();
+    }});
+    cnt.lay = lay;
+    box.append(el("div", {className: "cnt-wrap"}, el("img", {src: p.src}), lay));
+  }
+  renderMarks();
+  renderPanel();
+}
+
+/* 現在の写真のマーカーだけを描き直す */
+function renderMarks() {
+  if (!cnt.lay) return;
+  const p = cur[phaseKey(cnt.phase)][cnt.idx];
+  cnt.lay.textContent = "";
+  const seq = {};                             // 品目ごとの通し番号
+  p.marks.forEach((m, mi) => {
+    seq[m.k] = (seq[m.k] ?? 0) + 1;
+    const mk = el("span", {className: "mark", textContent: seq[m.k],
+      title: (cur.items.find(i => i.key === m.k)?.name ?? "") + "（タップで取り消し）",
+      onclick: e => { e.stopPropagation(); p.marks.splice(mi, 1); savePhotos(cnt.phase); renderMarks(); renderPanel(); }});
+    mk.style.left = m.x * 100 + "%";
+    mk.style.top = m.y * 100 + "%";
+    mk.style.background = itemColor(m.k);
+    cnt.lay.append(mk);
+  });
+}
+
+/* 右パネル（個数表示・凡例）だけを描き直す */
+function renderPanel() {
+  const photos = cur[phaseKey(cnt.phase)];
+
+  /* 選択中の品目の個数（フェーズ内の全写真の合算） */
+  const item = cur.items.find(i => i.key === cnt.itemKey);
+  $("#cntCount").innerHTML = item
+    ? `<b>${totalFor(item.key, cnt.phase)}</b>${esc(item.name)}${item.unit ? `（${esc(item.unit)}）` : ""}${photos.length > 1 ? "・全写真の合計" : ""}`
+    : "<b>—</b>品目を選んでください";
+
+  /* 凡例：マークのある品目＋選択中の品目。タップで品目を切り替え */
+  const legend = $("#cntLegend");
+  legend.textContent = "";
+  const keys = [...new Set(photos.flatMap(ph => ph.marks.map(m => m.k)))];
+  if (cnt.itemKey && !keys.includes(cnt.itemKey)) keys.unshift(cnt.itemKey);
+  for (const k of keys) {
+    const it = cur.items.find(i => i.key === k);
+    if (!it) continue;
+    const dot = el("span", {className: "dot"});
+    dot.style.background = itemColor(k);
+    legend.append(el("div", {className: "lg" + (k === cnt.itemKey ? " sel" : ""),
+      onclick: () => { cnt.itemKey = k; $("#cntItem").value = k; renderPanel(); }},
+      dot,
+      el("span", {textContent: it.name}),
+      el("b", {textContent: totalFor(k, cnt.phase)})));
+  }
+}
+
+function applyCounts() {
+  const which = cnt.phase === "in" ? "qtyIn" : "qtyOut";
+  const counted = cur.items.filter(i => totalFor(i.key, cnt.phase) > 0);
+  if (!counted.length) { alert("まだ何も数えていません。品目を選んで、写真の品物をタップしてください。"); return; }
+  counted.forEach(i => i[which] = String(totalFor(i.key, cnt.phase)));
+  persist();
+  renderSections();
+  closeCounter();
+  alert(`${counted.length} 品目の${phaseLabel(cnt.phase)}の数量を入力欄へ反映しました。\n\n`
+    + counted.map(i => `・${i.name}：${i[which]}${i.unit || ""}`).join("\n")
+    + "\n\n数えていない品目の入力欄は変更していません。");
 }
 
 /* ================= 印刷 ================= */
@@ -752,8 +993,40 @@ $("#doseBox").addEventListener("change", () => {
   persist();
 });
 
-$("#phIn").addEventListener("change", e => onPhotos(e.target, "photosIn"));
-$("#phOut").addEventListener("change", e => onPhotos(e.target, "photosOut"));
+$("#phIn").addEventListener("change", e => onPhotos(e.target, "in"));
+$("#phOut").addEventListener("change", e => onPhotos(e.target, "out"));
+
+/* --- 写真で数える --- */
+$("#btnCntIn").onclick = () => openCounter("in");
+$("#btnCntOut").onclick = () => openCounter("out");
+$("#cntPrev").onclick = () => { if (cnt.idx > 0) { cnt.idx--; renderCounter(); } };
+$("#cntNext").onclick = () => { if (cnt.idx < cur[phaseKey(cnt.phase)].length - 1) { cnt.idx++; renderCounter(); } };
+$("#cntAdd").onclick = () => $(cnt.phase === "in" ? "#phIn" : "#phOut").click();
+$("#cntClose").onclick = closeCounter;
+$("#cntItem").onchange = e => { cnt.itemKey = e.target.value; renderPanel(); };
+$("#cntApply").onclick = applyCounts;
+$("#cntUndo").onclick = () => {
+  const p = cur[phaseKey(cnt.phase)][cnt.idx];
+  if (!p || !cnt.itemKey) return;
+  for (let i = p.marks.length - 1; i >= 0; i--) {
+    if (p.marks[i].k === cnt.itemKey) { p.marks.splice(i, 1); break; }
+  }
+  savePhotos(cnt.phase);
+  renderMarks();
+  renderPanel();
+};
+$("#cntClear").onclick = () => {
+  if (!cnt.itemKey) return;
+  const it = cur.items.find(i => i.key === cnt.itemKey);
+  if (!confirm(`「${it?.name ?? ""}」のマークを、${phaseLabel(cnt.phase)}のすべての写真から消します。よろしいですか？`)) return;
+  cur[phaseKey(cnt.phase)].forEach(p => p.marks = p.marks.filter(m => m.k !== cnt.itemKey));
+  savePhotos(cnt.phase);
+  renderMarks();
+  renderPanel();
+};
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("#counter").hidden) closeCounter();
+});
 
 const startNew = () => {
   const name = prompt("利用者氏名を入力してください。\n過去に利用のある方は、前回の持ち物構成を引き継ぎます。", "");
